@@ -70,7 +70,7 @@ struct DmaDescriptor {
 
 fn mb() {
     unsafe {
-        #[cfg(target_arch = "riscv")]
+        #[cfg(target_arch = "riscv64")]
         {
             core::arch::asm!("fence iorw, iorw")
         }
