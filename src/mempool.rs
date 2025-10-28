@@ -4,7 +4,7 @@ use core::{cell::RefCell, marker::PhantomData, ptr::NonNull};
 
 use alloc::collections::VecDeque;
 
-use crate::dwmac::DwmacHal;
+use crate::DwmacHal;
 
 pub struct MemPool<H: DwmacHal, const N: usize, const PS: usize> {
     bus_addr: usize,

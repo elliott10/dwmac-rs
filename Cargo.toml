@@ -2,17 +2,14 @@
 name = "dwmac-rs"
 edition = "2021"
 authors = ["MingYang <my@famer.me>"]
-description = "Common traits and types for network device (NIC) drivers"
-keywords = ["arceos", "driver", "nic"]
-version.workspace = true
-license.workspace = true
-homepage.workspace = true
-repository = "https://github.com/mingyang91/dwmac-rs.git"
-
-[features]
-default = []
+description = "DWMAC 5.x Ethernet Driver"
+keywords = ["dwmac", "ethernet", "driver", "riscv"]
+version = "0.1.0"
+license = "MIT"
+homepage = "https://github.com/mingyang91/dwmac-rs"
+repository = "https://github.com/mingyang91/dwmac-rs"
 
 [dependencies]
-spin = "0.9"
 log = "0.4"
 bitflags = "2.9.1"
+spin = "0.9"
