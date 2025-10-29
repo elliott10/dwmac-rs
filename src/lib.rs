@@ -400,8 +400,8 @@ pub struct DwmacNic<H: DwmacHal> {
     mac_addr: [u8; 6],
     link_up: AtomicBool,
 
-    tx_ring: DescriptorRing<TX_DESC_COUNT, H>,
-    rx_ring: DescriptorRing<RX_DESC_COUNT, H>,
+    pub tx_ring: DescriptorRing<TX_DESC_COUNT, H>,
+    pub rx_ring: DescriptorRing<RX_DESC_COUNT, H>,
 
     _phantom: core::marker::PhantomData<H>,
 }
@@ -704,7 +704,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         Ok(())
     }
 
-    fn update_rx_end_addr(&self, index: usize) {
+    pub fn update_rx_end_addr(&self, index: usize) {
         mb();
         let addr = self.rx_ring.get_descriptor_paddr(index);
         log::trace!("🔧 Updating RX end address to {:#x}", addr);
@@ -712,7 +712,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         self.inspect_reg("DMA CHAN_RX_END_ADDR", regs::dma::CHAN_RX_END_ADDR);
     }
 
-    fn update_tx_end_addr(&self, index: usize) {
+    pub fn update_tx_end_addr(&self, index: usize) {
         mb();
         let addr = self.tx_ring.get_descriptor_paddr(index);
         log::trace!("🔧 Updating TX end address to {:#x}", addr);
@@ -1198,7 +1198,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         }
     }
 
-    fn clear_dma_intr_status(&self) -> bool {
+    pub fn clear_dma_intr_status(&self) -> bool {
         for i in 0..=7 {
             let chan_status = self.read_reg(regs::dma::chan_status_csr(i));
             if chan_status != 0 {
