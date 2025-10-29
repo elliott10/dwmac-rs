@@ -52,9 +52,9 @@ pub trait DwmacHal: Send + Sync {
 pub type PhysAddr = usize;
 
 /// Buffer sizes
-const TX_DESC_COUNT: usize = 2048;
-const RX_DESC_COUNT: usize = 2048;
-const MAX_FRAME_SIZE: usize = 1600; // (1536 + 64 - 1) / 64 * 64;
+pub const TX_DESC_COUNT: usize = 2048;
+pub const RX_DESC_COUNT: usize = 2048;
+pub const MAX_FRAME_SIZE: usize = 1600; // (1536 + 64 - 1) / 64 * 64;
 
 #[repr(C, align(64))]
 #[derive(Debug, Copy, Clone)]
@@ -140,7 +140,7 @@ impl DmaDescriptor {
 #[repr(C, align(64))]
 #[derive(Debug, Copy, Clone)]
 pub struct DmaExtendedDescriptor<H: DwmacHal> {
-    basic: DmaDescriptor,
+    pub basic: DmaDescriptor,
     // Extended fields for newer DWMAC versions
     // ext_status: u32,
     // reserved1: u32,
@@ -211,7 +211,7 @@ impl<const N: usize, H: DwmacHal> DescriptorRing<N, H> {
         unsafe { &*self.descriptors }
     }
 
-    fn descriptors_mut(&self) -> &mut [DmaExtendedDescriptor<H>; N] {
+    pub fn descriptors_mut(&self) -> &mut [DmaExtendedDescriptor<H>; N] {
         unsafe { &mut *(self.descriptors as *mut _) }
     }
 
@@ -397,8 +397,8 @@ impl<const N: usize, H: DwmacHal> DescriptorRing<N, H> {
 /// Simple DWMAC network interface
 pub struct DwmacNic<H: DwmacHal> {
     base_addr: NonNull<u8>,
-    mac_addr: [u8; 6],
-    link_up: AtomicBool,
+    pub mac_addr: [u8; 6],
+    pub link_up: AtomicBool,
 
     pub tx_ring: DescriptorRing<TX_DESC_COUNT, H>,
     pub rx_ring: DescriptorRing<RX_DESC_COUNT, H>,
@@ -1162,7 +1162,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         }
     }
 
-    fn read_mac_intr_status(&self) {
+    pub fn read_mac_intr_status(&self) {
         // read mac_intr_status to clear interrupt
         let mac_intr_status = self.read_reg(regs::mac::INTERRUPT_STATUS);
         if mac_intr_status != 0 {
