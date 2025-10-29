@@ -92,36 +92,36 @@ fn mb() {
 
 #[allow(dead_code)]
 impl DmaDescriptor {
-    fn des0(&self) -> u32 {
+    pub fn des0(&self) -> u32 {
         unsafe { read_volatile(&self.des0) }
     }
 
-    fn set_des0(&mut self, des0: u32) {
+    pub fn set_des0(&mut self, des0: u32) {
         unsafe { write_volatile(&mut self.des0, des0) };
     }
 
-    fn des1(&self) -> u32 {
+    pub fn des1(&self) -> u32 {
         unsafe { read_volatile(&self.des1) }
     }
 
-    fn set_des1(&mut self, des1: u32) {
+    pub fn set_des1(&mut self, des1: u32) {
         unsafe { write_volatile(&mut self.des1, des1) };
     }
 
-    fn des2(&self) -> u32 {
+    pub fn des2(&self) -> u32 {
         unsafe { read_volatile(&self.des2) }
     }
 
-    fn set_des2(&mut self, des2: u32) {
+    pub fn set_des2(&mut self, des2: u32) {
         unsafe { write_volatile(&mut self.des2, des2) };
     }
 
-    fn des3(&self) -> u32 {
+    pub fn des3(&self) -> u32 {
         mb();
         unsafe { read_volatile(&self.des3) }
     }
 
-    fn set_des3(&mut self, des3: u32) {
+    pub fn set_des3(&mut self, des3: u32) {
         mb();
         unsafe { write_volatile(&mut self.des3, des3) };
     }
