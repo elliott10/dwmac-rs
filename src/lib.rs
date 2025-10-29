@@ -8,6 +8,7 @@ mod mdio;
 mod mempool;
 mod regs;
 
+use core::result::Result;
 use core::ptr::{read_volatile, write_volatile, NonNull};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::{u8, usize};
