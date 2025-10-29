@@ -182,7 +182,7 @@ const POOL_SIZE: usize = 4096;
 pub struct DescriptorRing<const N: usize, H: DwmacHal> {
     descriptors: *const [DmaExtendedDescriptor<H>; N],
     phy_descriptors: PhysAddr,
-    mem_pool: MemPool<H, POOL_SIZE, MAX_FRAME_SIZE>,
+    pub mem_pool: MemPool<H, POOL_SIZE, MAX_FRAME_SIZE>,
     head: AtomicUsize,
     tail: AtomicUsize,
     _phantom: core::marker::PhantomData<H>,
