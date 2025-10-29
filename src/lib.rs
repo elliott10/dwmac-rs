@@ -58,7 +58,7 @@ pub const MAX_FRAME_SIZE: usize = 1600; // (1536 + 64 - 1) / 64 * 64;
 
 #[repr(C, align(64))]
 #[derive(Debug, Copy, Clone)]
-struct DmaDescriptor {
+pub struct DmaDescriptor {
     /// Buffer 1 address (low 32 bits) or additional info
     des0: u32,
     /// Buffer 2 address (low 32 bits) or additional info
