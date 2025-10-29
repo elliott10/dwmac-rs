@@ -18,7 +18,7 @@ use mdio::{
     YT8531C_EXT_RGMII_CONFIG1, YT8531C_EXT_SYNCE_CFG,
 };
 use mempool::MemPool;
-use regs::dma::{debug_tdes3_writeback, DESC_OWN, RDES3, TDES3WB};
+pub use regs::dma::{debug_tdes3_writeback, DESC_OWN, RDES3, TDES3WB};
 use regs::mtl::debug_mtl_tx_fifo_read_controller_status;
 
 extern crate alloc;
