@@ -488,7 +488,7 @@ pub mod dma {
     bitflags! {
         pub struct RDES3: u32 {
             const BUFFER1_VALID_ADDR = 1 << 24;
-            const BUFFER2_VALID_ADDR = 1 << 25;
+            const RDES3_RDES0_VALID = 1 << 25;
             const INT_ON_COMPLETION_EN = 1 << 30;
             const ERROR_SUMMARY = 1 << 15;
         }

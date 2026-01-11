@@ -15,7 +15,9 @@ pub struct MemPool<H: DwmacHal, const N: usize, const PS: usize> {
 
 impl<H: DwmacHal, const N: usize, const PS: usize> MemPool<H, N, PS> {
     pub fn new() -> Self {
-        let (bus_addr, ptr) = H::dma_alloc(PS * N, 64);
+        let (bus_addr, ptr) = H::dma_alloc(PS * N, 256);
+        log::debug!("MemPool dma_alloc({}x{})=(bus_addr={:#x}, ptr={:#x?})", PS, N, bus_addr, ptr);
+
         let mut free_buffers = VecDeque::new();
         for i in 0..N {
             free_buffers.push_back(unsafe { ptr.add(i * PS) });
