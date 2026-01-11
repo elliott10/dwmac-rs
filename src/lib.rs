@@ -143,7 +143,7 @@ impl DmaDescriptor {
 }
 
 #[repr(C)]
-#[derive(Debug, transparent, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct DmaExtendedDescriptor<H: DwmacHal> {
     pub basic: DmaDescriptor,
     // Extended fields for newer DWMAC versions
@@ -373,7 +373,7 @@ unsafe impl<H: DwmacHal> Send for DwmacNic<H> {}
 unsafe impl<H: DwmacHal> Sync for DwmacNic<H> {}
 
 impl<H: DwmacHal> DwmacNic<H> {
-    pub fn init0(base_addr: NonNull<u8>, _size: usize) -> Result<Self, &'static str> {
+    pub fn init(base_addr: NonNull<u8>, _size: usize) -> Result<Self, &'static str> {
         log::info!("Initializing DWMAC ethernet driver");
 
         dma_status_read();
@@ -448,14 +448,10 @@ impl<H: DwmacHal> DwmacNic<H> {
         Ok(nic)
     }
 
-    pub fn receive(&mut self) -> DevResult<NetBufPtr> {
-        if !self.can_receive() {
-            return Err(DevError::Again);
-        }
-
+    pub fn receive(&mut self) -> Result<&[u8], &'static str> {
         let head = self.rx_ring.head();
          if self.rx_ring.descriptors()[head].is_owned_by_dma() {
-            return Err(DevError::Again);
+            return Err("RX Error::Again");
         }
         
         self.rx_ring.advance_head();
@@ -475,10 +471,11 @@ impl<H: DwmacHal> DwmacNic<H> {
             head, buffer_ptr, packet_len
         );
 
-        let net_buf = NetBufPtr::new(self.rx_ring.mem_pool.base_ptr(), buffer_ptr, packet_len);
+        //let net_buf = NetBufPtr::new(self.rx_ring.mem_pool.base_ptr(), buffer_ptr, packet_len);
+        let net_buf = unsafe { core::slice::from_raw_parts(buffer_ptr.as_ptr(), packet_len) };
 
         // Recycle rx buffer
-        let buf_ptr = self.rx_ring.mem_pool.alloc().ok_or(DevError::NoMemory)?;
+        let buf_ptr = self.rx_ring.mem_pool.alloc().ok_or("RX Error::NoMemory")?;
         let bus_addr = self.rx_ring.mem_pool.bus_addr(buf_ptr);
         self.rx_ring.buffers[head] = bus_addr;
 
@@ -518,30 +515,30 @@ impl<H: DwmacHal> DwmacNic<H> {
         Ok(net_buf)
     }
 
-    pub fn transmit(&mut self, tx_buf: NetBufPtr) -> DevResult {
-        if !self.can_transmit() {
-            return Err(DevError::Again);
+    pub fn transmit(&mut self, tx_buf: &[u8]) -> Result<(), &'static str> {
+        if self.tx_ring.is_full() {
+            return Err("TX Error::Again");
         }
         debug!(
             "transmit buf_ptr={:#x} {:x?}",
-            tx_buf.buf_ptr.as_ptr() as usize,
-            tx_buf.packet()
+            tx_buf.as_ptr() as usize,
+            tx_buf,
         );
 
-        let bus_addr = self.tx_ring.mem_pool.bus_addr(tx_buf.buf_ptr);
-        let length = tx_buf.packet_len() as u32;
+        let bus_addr = self.tx_ring.mem_pool.bus_addr(NonNull::new(tx_buf.as_ptr() as *mut u8).unwrap());
+        let length = tx_buf.len() as u32;
 
         let head = self.tx_ring.head();
         let next = self.tx_ring.next_tail();
         if next == head {
             error!("head {} == next", head);
-            return Err(DevError::Again);
+            return Err("TX Error::Again");
         }
 
         let tail = self.tx_ring.tail();
         if self.tx_ring.descriptors()[tail].is_owned_by_dma() {
             error!("🔍 TX descriptor is owned by DMA");
-            return Err(DevError::Again);
+            return Err("TX Error::Again");
         }
         self.tx_ring.advance_head();
         let index = tail;
