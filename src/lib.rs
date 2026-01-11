@@ -448,6 +448,133 @@ impl<H: DwmacHal> DwmacNic<H> {
         Ok(nic)
     }
 
+    pub fn receive(&mut self) -> DevResult<NetBufPtr> {
+        if !self.can_receive() {
+            return Err(DevError::Again);
+        }
+
+        let head = self.rx_ring.head();
+         if self.rx_ring.descriptors()[head].is_owned_by_dma() {
+            return Err(DevError::Again);
+        }
+        
+        self.rx_ring.advance_head();
+        let desc = &mut self.rx_ring.descriptors_mut()[head];
+
+        let (buffer_ptr, packet_len) = {
+            let packet_len = (desc.basic.des3() & 0x7fff) as usize;
+            //let bus_addr = desc.basic.des0() as usize | ((desc.basic.des1() as usize) << 32);
+            let bus_addr = self.rx_ring.buffers[head];
+            info!("get_completed_rx_descriptor got bus_addr={:#x}", bus_addr);
+            let buffer_ptr = self.rx_ring.mem_pool.bus_addr_to_ptr(bus_addr);
+            (buffer_ptr, packet_len)
+        }; 
+
+        info!(
+            "Receive head={},buffer_ptr={:#x?}, packet_len={} ",
+            head, buffer_ptr, packet_len
+        );
+
+        let net_buf = NetBufPtr::new(self.rx_ring.mem_pool.base_ptr(), buffer_ptr, packet_len);
+
+        // Recycle rx buffer
+        let buf_ptr = self.rx_ring.mem_pool.alloc().ok_or(DevError::NoMemory)?;
+        let bus_addr = self.rx_ring.mem_pool.bus_addr(buf_ptr);
+        self.rx_ring.buffers[head] = bus_addr;
+
+        let desc = &mut self.rx_ring.descriptors_mut()[head];
+        desc.set_buffer_paddr(bus_addr);
+        desc.basic.set_des1(0);
+        desc.basic.set_des2(0);
+        desc.basic.set_des3(
+            regs::dma::DESC_OWN
+                | RDES3::BUFFER1_VALID_ADDR.bits()
+                | RDES3::INT_ON_COMPLETION_EN.bits(),
+        );
+
+        log::info!("RX buffer recycled, RX index: {}", head);
+
+        self.update_rx_end_addr(head);
+        
+        /*
+        for i in 0..16 {
+            let desc1 = &self.rx_ring.descriptors()[i];
+            //let d1 = desc1 = desc1 as *const u32 as usize;
+            let desc_ptr = self.rx_ring.get_descriptor_paddr(i) as u32;
+            let (desc0, desc1, desc2, desc3) = desc1.get_all_desc();
+            debug!(
+                "transmit RX desc[{}] @{:#x}: desc0={:#x}, desc1={:#x}, desc2={:#x}, desc3={:#x}",
+                i,desc_ptr, desc0, desc1, desc2, desc3
+            );
+            debug!("rx ring buffer[{}]={:#x}", i, self.rx_ring.buffers[i]);
+        }*/
+        log::info!(
+            "<<<< Packet received, length: {}, RX desc@{:#x} index: {}",
+            packet_len,
+            self.rx_ring.get_descriptor_paddr(head) as u32,
+            head
+        );
+
+        Ok(net_buf)
+    }
+
+    pub fn transmit(&mut self, tx_buf: NetBufPtr) -> DevResult {
+        if !self.can_transmit() {
+            return Err(DevError::Again);
+        }
+        debug!(
+            "transmit buf_ptr={:#x} {:x?}",
+            tx_buf.buf_ptr.as_ptr() as usize,
+            tx_buf.packet()
+        );
+
+        let bus_addr = self.tx_ring.mem_pool.bus_addr(tx_buf.buf_ptr);
+        let length = tx_buf.packet_len() as u32;
+
+        let head = self.tx_ring.head();
+        let next = self.tx_ring.next_tail();
+        if next == head {
+            error!("head {} == next", head);
+            return Err(DevError::Again);
+        }
+
+        let tail = self.tx_ring.tail();
+        if self.tx_ring.descriptors()[tail].is_owned_by_dma() {
+            error!("🔍 TX descriptor is owned by DMA");
+            return Err(DevError::Again);
+        }
+        self.tx_ring.advance_head();
+        let index = tail;
+        let desc = &mut self.tx_ring.descriptors_mut()[index];
+
+        desc.set_buffer_paddr(bus_addr);
+        desc.basic.set_des1(0);
+        desc.basic.set_des2(length);
+        desc.basic.set_des3(
+            regs::dma::DESC_OWN
+                | regs::dma::TDES3::FIRST_DESCRIPTOR.bits()
+                | regs::dma::TDES3::LAST_DESCRIPTOR.bits()
+                | length,
+        );
+
+        self.tx_ring.buffers[index] = bus_addr;
+        self.tx_ring.flush_descriptors();
+        mb();
+
+        self.tx_ring.advance_tail();
+        self.update_tx_end_addr(self.tx_ring.tail());
+
+        loop {
+            if self.tx_ring.descriptors()[index].basic.des3() & regs::dma::DESC_OWN == 0 {
+                break;
+            }
+        }
+        info!(">>>> Packet transmitted {}, TX desc@{:#x} index: {}", length, 
+        self.tx_ring.get_descriptor_paddr(index) as u32, index);
+
+        Ok(())
+    }
+
     /// Initialize the DWMAC device
     pub fn init0(base_addr: NonNull<u8>, _size: usize) -> Result<Self, &'static str> {
         log::info!("🚀 Initializing DWMAC ethernet driver (tutorial version)");
@@ -677,6 +804,7 @@ impl<H: DwmacHal> DwmacNic<H> {
             if bmsr == 0x796d {
                 // 0x796d is target value
                 log::info!("🔍 PHY BMSR: {:#x}", bmsr);
+                log::info!("++ Read MAC US_TIC_COUNTER: {}", self.read_reg(regs::mac::US_TIC_COUNTER));
                 break;
             }
             H::wait_until(core::time::Duration::from_millis(10))?;
@@ -720,6 +848,10 @@ impl<H: DwmacHal> DwmacNic<H> {
             self.rx_ring.get_descriptor_paddr(0) as u32,
         );
         self.inspect_reg("DMA CHAN_RX_BASE_ADDR", regs::dma::CHAN_RX_BASE_ADDR);
+        self.write_reg(
+            regs::dma::CHAN_RX_END_ADDR,
+            self.rx_ring.get_descriptor_paddr(RX_DESC_COUNT - 1) as u32,
+        );
         // Set RX ring length
         self.write_reg(regs::dma::CHAN_RX_RING_LEN, (RX_DESC_COUNT - 1) as u32);
 
@@ -745,7 +877,7 @@ impl<H: DwmacHal> DwmacNic<H> {
     pub fn update_rx_end_addr(&self, index: usize) {
         mb();
         let addr = self.rx_ring.get_descriptor_paddr(index);
-        log::trace!("🔧 Updating RX end address to {:#x}", addr);
+        log::debug!("🔧 Updating RX end address to {:#x}", addr);
         self.write_reg(regs::dma::CHAN_RX_END_ADDR, addr as u32);
         self.inspect_reg("DMA CHAN_RX_END_ADDR", regs::dma::CHAN_RX_END_ADDR);
     }
@@ -753,7 +885,7 @@ impl<H: DwmacHal> DwmacNic<H> {
     pub fn update_tx_end_addr(&self, index: usize) {
         mb();
         let addr = self.tx_ring.get_descriptor_paddr(index);
-        log::trace!("🔧 Updating TX end address to {:#x}", addr);
+        log::debug!("🔧 Updating TX end address to {:#x}", addr);
         self.write_reg(regs::dma::CHAN_TX_END_ADDR, addr as u32);
         self.inspect_reg("DMA CHAN_TX_END_ADDR", regs::dma::CHAN_TX_END_ADDR);
     }
@@ -768,10 +900,11 @@ impl<H: DwmacHal> DwmacNic<H> {
         // // setbits_le32 mac_regs->configuration(0000000016040000): 30e003
         self.write_reg(regs::mac::CONFIG, 0x30e003);
         self.inspect_reg("MAC CONFIG", regs::mac::CONFIG);
-
-        // Set RX ring end address
-        self.update_rx_end_addr(RX_DESC_COUNT - 1);
-        self.inspect_reg("DMA CHAN_RX_END_ADDR", regs::dma::CHAN_RX_END_ADDR);
+        /*
+        let config = self.read_reg(regs::mac::CONFIG);
+        self.write_reg(regs::mac::CONFIG, config | (EQOS_MAC_CONFIGURATION_TE | EQOS_MAC_CONFIGURATION_RE));
+        */
+        mb();
 
         // let status = self.read_reg(regs::dma::CHAN_STATUS);
         // log::info!("DMA CHAN_STATUS: {:#x}", status);
@@ -997,7 +1130,8 @@ impl<H: DwmacHal> DwmacNic<H> {
             // NOTE: 非常重要，PHY 稳定前配置 GMAC 会导致网卡无法正常工作。
             if bmsr == 0x796d {
                 // 0x796d is target value
-                log::info!("🔍 PHY BMSR: {:#x}", bmsr);
+                log::info!("++ 🔍 PHY BMSR: {:#x}", bmsr);
+
                 break;
             }
             H::wait_until(core::time::Duration::from_millis(10))?;

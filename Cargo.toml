@@ -1,10 +1,10 @@
 [package]
 name = "dwmac-rs"
 edition = "2021"
-authors = ["MingYang <my@famer.me>"]
+authors = ["MingYang <my@famer.me>", Xiao <xiaoluoyuan@163.com>]
 description = "DWMAC 5.x Ethernet Driver"
 keywords = ["dwmac", "ethernet", "driver", "riscv"]
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT"
 homepage = "https://github.com/mingyang91/dwmac-rs"
 repository = "https://github.com/mingyang91/dwmac-rs"
