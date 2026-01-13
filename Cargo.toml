@@ -12,4 +12,3 @@ repository = "https://github.com/elliott10/dwmac-rs.git"
 [dependencies]
 log = "0.4"
 bitflags = "2.9.1"
-spin = "0.9"

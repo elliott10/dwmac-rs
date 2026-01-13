@@ -48,7 +48,7 @@ pub const MAC_MDIO_ADDRESS_CR: u32 = 0x4; // 时钟范围设置
 pub const MAC_MDIO_ADDRESS_PA_SHIFT: u32 = 21; // PHY Address
 pub const MAC_MDIO_ADDRESS_RDA_SHIFT: u32 = 16; // Register/Device Address
 
-// YT8531C标准寄存器
+// Generic MII registers
 pub const YT8531C_BMCR: u16 = 0x00; // Basic Mode Control Register
 pub const YT8531C_BMSR: u16 = 0x01; // Basic Mode Status Register
 pub const YT8531C_PHYID1: u16 = 0x02; // PHY Identifier 1
@@ -66,6 +66,9 @@ pub const YT8531C_EXT_CHIP_CONFIG: u16 = 0xa001;
 pub const YT8531C_EXT_RGMII_CONFIG1: u16 = 0xa003;
 pub const YT8531C_EXT_CLK_TX_INVERT: u16 = 0xa010;
 pub const YT8531C_EXT_SYNCE_CFG: u16 = 0xa012;
+
+pub const PHY_ID_YT8531: u32 = 0x4f51e91b;
+pub const MOTORCOMM_PHY_ID_MASK: u32 = 0x00000fff;
 
 // 延迟配置位定义
 const YT8531_CCR_RXC_DLY_EN: u16 = 1 << 8; // RX时钟延迟使能
@@ -264,7 +267,7 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
     }
 
     pub fn set_phy_linus(&self) -> Result<()> {
-        log::info!("🔧 Setting PHY to Linux configuration...");
+        log::debug!("🔧 Setting PHY to Linux configuration...");
         self.soft_reset()?;
         self.write_ext_reg(0xa001, 0x7960)?;
         self.write_ext_reg(0xa003, 0xe91b)?;
@@ -279,7 +282,7 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
     }
 
     pub fn configure_rgmii_id(&mut self) -> Result<()> {
-        log::info!("🔧 Configuring YT8531 RGMII-ID mode...");
+        log::debug!("🔧 Configuring YT8531 RGMII-ID mode...");
 
         // 1. 配置RGMII延迟参数
         self.configure_rgmii_delays()?;
@@ -290,7 +293,7 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
         // 3. 启用RX时钟门控
         self.enable_rx_clock_gating()?;
 
-        log::info!("✅ RGMII-ID configuration completed");
+        log::debug!("✅ RGMII-ID configuration completed");
         Ok(())
     }
 
@@ -321,12 +324,12 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
         self.write_ext_reg(YT8531C_EXT_CHIP_CONFIG, config_reg)?;
         self.write_ext_reg(YT8531C_EXT_RGMII_CONFIG1, rgmii_reg)?;
 
-        log::info!(
+        log::debug!(
             "   📊 RX delay: {}ps (reg: 0x{:X})",
             rx_delay_ps,
             rx_reg_val
         );
-        log::info!(
+        log::debug!(
             "   📊 TX delay: {}ps (reg: 0x{:X})",
             tx_delay_ps,
             tx_reg_val
@@ -356,7 +359,7 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
         clk_config |= 1 << 5; // 1000M TX时钟反转
         self.write_ext_reg(YT8531C_EXT_CLK_TX_INVERT, clk_config)?;
 
-        log::info!("   🔧 Motorcomm specific features configured");
+        log::debug!("   🔧 Motorcomm specific features configured");
         Ok(())
     }
 
@@ -366,7 +369,7 @@ impl<H: super::DwmacHal> Yt8531cPhy<H> {
         clock_gating |= YT8531_CGR_RX_CLK_EN;
         self.write_ext_reg(YT8531C_CLOCK_GATING_REG, clock_gating)?;
 
-        log::info!("   ⚡ RX clock gating enabled");
+        log::debug!("   ⚡ RX clock gating enabled");
         Ok(())
     }
 }

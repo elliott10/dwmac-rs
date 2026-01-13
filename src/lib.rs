@@ -5,14 +5,16 @@
 //! It demonstrates the core concepts of ethernet driver development
 //! without production-level complexity.
 
+#![allow(unused)]
+
 mod mdio;
 mod mempool;
 mod regs;
 
 mod dwc_const;
 mod dwc_init;
-use dwc_const::*;
-use dwc_init::*;
+pub use dwc_const::*;
+pub use dwc_init::*;
 
 use core::ptr::{read_volatile, write_volatile, NonNull};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -20,7 +22,7 @@ use core::{u8, usize};
 use log::{debug, error, info, log_enabled, warn};
 use mdio::{
     Yt8531cPhy, YT8531C_BMSR, YT8531C_EXT_CHIP_CONFIG, YT8531C_EXT_CLK_TX_INVERT,
-    YT8531C_EXT_RGMII_CONFIG1, YT8531C_EXT_SYNCE_CFG,
+    YT8531C_EXT_RGMII_CONFIG1, YT8531C_EXT_SYNCE_CFG, PHY_ID_YT8531,
 };
 use mempool::MemPool;
 pub use regs::dma::{debug_tdes3_writeback, DESC_OWN, RDES3, TDES3, TDES3WB};
@@ -200,7 +202,7 @@ impl<const N: usize, H: DwmacHal> DescriptorRing<N, H> {
             H::dma_alloc(N * size_of::<DmaExtendedDescriptor<H>>(), 16);
         // !注意Desc地址对齐的问题
 
-        log::info!(
+        debug!(
             "🔍 Descriptor ring allocated {} DmaExtDesc size: {}, DmaDesc size={}, align of {},  at bus: 0x{:0>8x}, virt: {:p}",
             N, size_of::<DmaExtendedDescriptor<H>>(), size_of::<DmaDescriptor>(),align_of::<DmaDescriptor>(),
             phy_descriptors,
@@ -374,7 +376,7 @@ unsafe impl<H: DwmacHal> Sync for DwmacNic<H> {}
 
 impl<H: DwmacHal> DwmacNic<H> {
     pub fn init(base_addr: NonNull<u8>, _size: usize) -> Result<Self, &'static str> {
-        log::info!("Initializing DWMAC ethernet driver");
+        debug!("Initializing DWMAC ethernet driver");
 
         dma_status_read();
 
@@ -404,8 +406,7 @@ impl<H: DwmacHal> DwmacNic<H> {
             log::error!("PHY initialization failed: {:?}", e);
         });
         nic.set_clock_freq(0x7c)?;
-        */
-        /*
+
         // eqos_adjust_link
         let mut mac_config = nic.read_reg(regs::mac::CONFIG);
         let speed_1000M = true;
@@ -419,7 +420,6 @@ impl<H: DwmacHal> DwmacNic<H> {
         mac_config |= EQOS_MAC_CONFIGURATION_DM; // Full duplex
         nic.write_reg(regs::mac::CONFIG, mac_config);
         */
-
         /*
         nic.stop_dma();
         nic.set_sys_bus_mode(0x030308F1); // dump from Linux: 0x030308F1
@@ -444,7 +444,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
         dma_status_read();
 
-        log::info!("DWMAC initialized");
+        debug!("DWMAC initialized");
         Ok(nic)
     }
 
@@ -461,12 +461,12 @@ impl<H: DwmacHal> DwmacNic<H> {
             let packet_len = (desc.basic.des3() & 0x7fff) as usize;
             //let bus_addr = desc.basic.des0() as usize | ((desc.basic.des1() as usize) << 32);
             let bus_addr = self.rx_ring.buffers[head];
-            info!("get_completed_rx_descriptor got bus_addr={:#x}", bus_addr);
+            debug!("get_completed_rx_descriptor got bus_addr={:#x}", bus_addr);
             let buffer_ptr = self.rx_ring.mem_pool.bus_addr_to_ptr(bus_addr);
             (buffer_ptr, packet_len)
         }; 
 
-        info!(
+        debug!(
             "Receive head={},buffer_ptr={:#x?}, packet_len={} ",
             head, buffer_ptr, packet_len
         );
@@ -489,7 +489,7 @@ impl<H: DwmacHal> DwmacNic<H> {
                 | RDES3::INT_ON_COMPLETION_EN.bits(),
         );
 
-        log::info!("RX buffer recycled, RX index: {}", head);
+        debug!("RX buffer recycled, RX index: {}", head);
 
         self.update_rx_end_addr(head);
         
@@ -505,7 +505,7 @@ impl<H: DwmacHal> DwmacNic<H> {
             );
             debug!("rx ring buffer[{}]={:#x}", i, self.rx_ring.buffers[i]);
         }*/
-        log::info!(
+        info!(
             "<<<< Packet received, length: {}, RX desc@{:#x} index: {}",
             packet_len,
             self.rx_ring.get_descriptor_paddr(head) as u32,
@@ -566,6 +566,7 @@ impl<H: DwmacHal> DwmacNic<H> {
                 break;
             }
         }
+        dma_status_read();
         info!(">>>> Packet transmitted {}, TX desc@{:#x} index: {}", length, 
         self.tx_ring.get_descriptor_paddr(index) as u32, index);
 
@@ -574,7 +575,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Initialize the DWMAC device
     pub fn init0(base_addr: NonNull<u8>, _size: usize) -> Result<Self, &'static str> {
-        log::info!("🚀 Initializing DWMAC ethernet driver (tutorial version)");
+        debug!("🚀 Initializing DWMAC ethernet driver (tutorial version)");
 
         // eqos_start(dev=00000000ff728340):
         // jh7110_reset_trigger: deasserting reset 66 (reg=0x13020300, value=0xffe5efc8)
@@ -704,13 +705,13 @@ impl<H: DwmacHal> DwmacNic<H> {
 
         nic.inspect_reg("DMA STATUS", regs::dma::DMA_STATUS);
 
-        log::info!("✅ DWMAC initialization complete");
+        debug!("✅ DWMAC initialization complete");
         Ok(nic)
     }
 
     /// Enable DMA interrupts
     fn enable_dma_interrupts(&self) -> Result<(), &'static str> {
-        log::info!("🔧 Enabling DMA channel 0 interrupts...");
+        debug!("🔧 Enabling DMA channel 0 interrupts...");
 
         self.write_reg(
             regs::dma::CHAN_STATUS,
@@ -725,7 +726,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         );
         self.inspect_reg("DMA CHAN_INTR_ENABLE", regs::dma::CHAN_INTR_ENABLE);
 
-        log::info!("🔧 Enabling GMAC interrupts...");
+        debug!("🔧 Enabling GMAC interrupts...");
 
         self.inspect_reg("MAC INTERRUPT_STATUS", regs::mac::INTERRUPT_STATUS);
         self.write_reg(
@@ -734,7 +735,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         );
 
         // if self.read_reg(regs::mac::INTERRUPT_STATUS) != 0 {
-        //     log::info!("🔧 Waiting for GMAC interrupt status to clear...");
+        //     debug!("🔧 Waiting for GMAC interrupt status to clear...");
         //     for _ in 0..1000 {
         //         if self.read_reg(regs::mac::INTERRUPT_STATUS) == 0 {
         //             break;
@@ -763,7 +764,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Reset the hardware
     fn reset_dma(&self) -> Result<(), &'static str> {
-        log::info!("🔄 Resetting DMA Mode");
+        debug!("🔄 Resetting DMA Mode");
 
         self.inspect_reg("DMA BUS_MODE", regs::dma::BUS_MODE);
 
@@ -781,12 +782,12 @@ impl<H: DwmacHal> DwmacNic<H> {
             H::wait_until(core::time::Duration::from_millis(1))?;
         }
 
-        log::info!("✅ DMA Mode reset complete");
+        debug!("✅ DMA Mode reset complete");
         Ok(())
     }
 
     fn set_clock_freq(&self, freq: u32) -> Result<(), &'static str> {
-        log::info!("🔧 Setting clock frequency to {} MHz", freq);
+        debug!("🔧 Setting clock frequency to {} MHz", freq);
         self.write_reg(regs::mac::US_TIC_COUNTER, freq);
         self.inspect_reg("MAC US_TIC_COUNTER", regs::mac::US_TIC_COUNTER);
 
@@ -800,8 +801,8 @@ impl<H: DwmacHal> DwmacNic<H> {
             // NOTE: 非常重要，PHY 稳定前配置 GMAC 会导致网卡无法正常工作。
             if bmsr == 0x796d {
                 // 0x796d is target value
-                log::info!("🔍 PHY BMSR: {:#x}", bmsr);
-                log::info!("++ Read MAC US_TIC_COUNTER: {}", self.read_reg(regs::mac::US_TIC_COUNTER));
+                debug!("🔍 PHY BMSR: {:#x}", bmsr);
+                debug!("++ Read MAC US_TIC_COUNTER: {}", self.read_reg(regs::mac::US_TIC_COUNTER));
                 break;
             }
             H::wait_until(core::time::Duration::from_millis(10))?;
@@ -817,7 +818,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Setup DMA descriptor rings
     fn setup_descriptor_rings(&mut self) -> Result<(), &'static str> {
-        log::info!("🔧 Setting up descriptor rings");
+        debug!("🔧 Setting up descriptor rings");
 
         self.rx_ring.init_rx_ring()?;
         self.tx_ring.init_tx_ring()?;
@@ -867,7 +868,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         // );
         // self.inspect_reg("DMA CHAN_TX_END_ADDR", regs::dma::CHAN_TX_END_ADDR);
 
-        log::info!("✅ Descriptor rings ready");
+        debug!("✅ Descriptor rings ready");
         Ok(())
     }
 
@@ -889,7 +890,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Configure MAC settings
     fn start_mac(&self) -> Result<(), &'static str> {
-        log::info!("🔧 Configuring MAC");
+        debug!("🔧 Configuring MAC");
 
         self.write_reg(regs::mac::FRAME_FILTER, 0x404); //regs::mac::PacketFilter::PR.bits()); // dump from linux: 0x404
         self.inspect_reg("MAC FRAME_FILTER", regs::mac::FRAME_FILTER);
@@ -904,26 +905,26 @@ impl<H: DwmacHal> DwmacNic<H> {
         mb();
 
         // let status = self.read_reg(regs::dma::CHAN_STATUS);
-        // log::info!("DMA CHAN_STATUS: {:#x}", status);
+        // debug!("DMA CHAN_STATUS: {:#x}", status);
         // for _ in 0..10 {
         //     log::error!("DMA CHAN_STATUS is not 0: {:#x}", status);
         //     self.write_reg(regs::dma::CHAN_STATUS, status);
         //     self.inspect_reg("DMA CHAN_STATUS", regs::dma::CHAN_STATUS);
         //     if self.read_reg(regs::dma::CHAN_STATUS) == 0 {
-        //         log::info!("DMA CHAN_STATUS resetted");
+        //         debug!("DMA CHAN_STATUS resetted");
         //         break;
         //     }
         //     H::wait_until(core::time::Duration::from_millis(10))?;
         // }
 
-        log::info!("🔧 MAC enabled");
+        debug!("🔧 MAC enabled");
         self.inspect_reg("MAC VERSION", regs::mac::VERSION);
         Ok(())
     }
 
     /// Setup MAC address
     fn setup_mac_address(&self) {
-        log::info!("🔧 Setting MAC address");
+        debug!("🔧 Setting MAC address");
 
         let mac_high = ((self.mac_addr[5] as u32) << 8) | (self.mac_addr[4] as u32);
         let mac_low = ((self.mac_addr[3] as u32) << 24)
@@ -946,7 +947,7 @@ impl<H: DwmacHal> DwmacNic<H> {
     }
 
     fn stop_dma(&self) {
-        log::info!("🔧 Stopping DMA");
+        debug!("🔧 Stopping DMA");
         // setbits_le32 dma_regs->ch0_tx_control(0000000016041104): 10
         self.write_reg(regs::dma::CHAN_TX_CTRL, 0x10);
         // clrsetbits_le32 dma_regs->ch0_rx_control(0000000016041108), mask: 7ffe, val: c80, final: c80
@@ -965,7 +966,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Start DMA operations
     fn start_dma(&self) -> Result<(), &'static str> {
-        log::info!("🚀 Starting DMA");
+        debug!("🚀 Starting DMA");
         // setbits_le32 dma_regs->ch0_tx_control(0000000016041104): 80011
         self.write_reg(regs::dma::CHAN_TX_CTRL, 0x80011);
         // setbits_le32 dma_regs->ch0_rx_control(0000000016041108): 80c81
@@ -975,7 +976,7 @@ impl<H: DwmacHal> DwmacNic<H> {
     }
 
     fn init_mtl(&self) -> Result<(), &'static str> {
-        log::info!("🔧 Initializing MTL");
+        debug!("🔧 Initializing MTL");
         // setbits_le32 mtl_regs->txq0_operation_mode(0000000016040d00): 7000a
         self.write_reg(regs::mtl::TXQ0_OPERATION_MODE, 0x7000a);
         self.inspect_reg("MTL TXQ0_OPERATION_MODE", regs::mtl::TXQ0_OPERATION_MODE);
@@ -1004,7 +1005,7 @@ impl<H: DwmacHal> DwmacNic<H> {
     }
 
     fn flow_control(&self) -> Result<(), &'static str> {
-        log::info!("🔧 Configuring flow control");
+        debug!("🔧 Configuring flow control");
         // clrsetbits_le32 mac_regs->rxq_ctrl0(00000000160400a0), mask: 3, val: 2, final: 0
         self.set_bits(regs::mac::RXQ_CTRL0, 0x3, 0x2);
         self.inspect_reg("MAC RXQ_CTRL0", regs::mac::RXQ_CTRL0);
@@ -1038,7 +1039,7 @@ impl<H: DwmacHal> DwmacNic<H> {
 
     /// Initialize PHY (simplified)
     fn init_phy(&self, phy_addr: u8) -> Result<(), &'static str> {
-        log::info!("🔧 Initializing PHY (basic)");
+        debug!("🔧 Initializing PHY (basic)");
 
         let phy = Yt8531cPhy::<H>::new(self.base_addr.as_ptr() as usize, phy_addr);
         phy.soft_reset().map_err(|e| {
@@ -1051,8 +1052,8 @@ impl<H: DwmacHal> DwmacNic<H> {
             "PHY not responding"
         })?;
 
-        log::info!("🔍 PHY ID: {:#x}", phy_id);
-        if phy_id != 0x4f51e91b {
+        debug!("🔍 PHY ID: {:#x}", phy_id);
+        if phy_id != PHY_ID_YT8531 {
             log::error!("PHY ID mismatch: {:#x}", phy_id);
             return Err("PHY ID mismatch");
         }
@@ -1127,7 +1128,7 @@ impl<H: DwmacHal> DwmacNic<H> {
             // NOTE: 非常重要，PHY 稳定前配置 GMAC 会导致网卡无法正常工作。
             if bmsr == 0x796d {
                 // 0x796d is target value
-                log::info!("++ 🔍 PHY BMSR: {:#x}", bmsr);
+                debug!("++ 🔍 PHY BMSR: {:#x}", bmsr);
 
                 break;
             }
@@ -1138,7 +1139,7 @@ impl<H: DwmacHal> DwmacNic<H> {
             log::warn!("⚠️  PHY not responding: {:?}", e);
             "PHY not responding"
         })?;
-        log::info!("🔍 PHY EXT_CHIP_CONFIG: {:#x}", config);
+        debug!("🔍 PHY EXT_CHIP_CONFIG: {:#x}", config);
 
         // phy.write_ext_reg(YT8531C_EXT_RGMII_CONFIG1, 0x850) // Magic number
         //     .map_err(|e| {
@@ -1170,7 +1171,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         //     "PHY not responding"
         // })?;
 
-        log::info!(
+        debug!(
             "🔍 PHY EXT_RGMII_CONFIG1: {:#x}",
             phy.read_ext_reg(YT8531C_EXT_RGMII_CONFIG1).unwrap()
         );
@@ -1291,7 +1292,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         self.inspect_reg("DMA_CHAN_STATUS", regs::dma::CHAN_STATUS);
         // let dma_intr_status = self.read_reg(0x1100 + 0x60);
         // if dma_intr_status != 0 {
-        //     log::info!("DMA_INTR_STATUS: {:#x}", dma_intr_status);
+        //     debug!("DMA_INTR_STATUS: {:#x}", dma_intr_status);
         //     self.write_reg(0x1100 + 0x60, dma_intr_status);
         // }
         for i in 0..=7 {
@@ -1303,7 +1304,7 @@ impl<H: DwmacHal> DwmacNic<H> {
         // let tx_fsm = dma_chan0_debug_status & 0x7;
         // let rx_fsm = (dma_chan0_debug_status >> 16) & 0x7;
         // if tx_fsm != 0 || rx_fsm != 0 {
-        //     log::info!(
+        //     debug!(
         //         "DMA_CHAN0_DEBUG_STATUS: {:#x}, tx_fsm: {:#x}, rx_fsm: {:#x}",
         //         dma_chan0_debug_status,
         //         tx_fsm,

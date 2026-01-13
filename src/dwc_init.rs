@@ -1,5 +1,6 @@
-use super::dwc_const::*;
+#[allow(unused_variables)]
 
+use super::dwc_const::*;
 use log::*;
 
 pub const ETHERNET1: u32 = 0x16040000;
@@ -69,10 +70,10 @@ pub fn jh7110_reset_trigger(id: u32, assert: bool) -> u32 {
 }
 
 pub fn jh7110_clock_reset() {
-    log::info!("--------- jh7110_clock_reset");
+    info!("--------- jh7110_clock_reset");
 
     /* 会导致发包数少发！
-    log::info!("---------init clk");
+    info!("---------init clk");
     for i in 97..112 {
         writev(CLOCK_CLKGEN1 + i * 4, 0x80000000);
     }
@@ -111,8 +112,8 @@ pub fn phy_config() {
     mdio_write_cl(ETHERNET1, YTPHY_PAD_DRIVES_STRENGTH_CFG, 0xcbff);
     mdio_write_cl(ETHERNET1, YTPHY_EXTREG_RGMII_CONFIG1, 0x850);
 
-    log::info!("-------------------phylink_start phylink_speed_up--------------");
-    log::info!("-------------------phy_config_aneg--------------");
+    info!("-------------------phylink_start phylink_speed_up--------------");
+    info!("-------------------phy_config_aneg--------------");
     mdio_write_cl(ETHERNET1, 0x1de1, 0x300);
 }
 
@@ -156,7 +157,7 @@ fn mdio_read_cl(iobase: u32, reg: u32) -> u32 {
     let addr = 0x3;
     let mut miiaddr = ((addr << MIIADDRSHIFT) & MII_ADDRMSK) | ((reg << MIIREGSHIFT) & MII_REGMSK);
     miiaddr = miiaddr | MII_CLKRANGE_150_250M | MII_BUSY;
-    log::info!("dw_mdio_read  reg={:#x?}", reg);
+    info!("dw_mdio_read  reg={:#x?}", reg);
     writev((iobase + 0x10), miiaddr);
     loop {
         let value = readv(iobase + 0x10);
@@ -167,16 +168,16 @@ fn mdio_read_cl(iobase: u32, reg: u32) -> u32 {
     }
 }
 
-//        log::info!("-------------------open--------------");
+//        info!("-------------------open--------------");
 
 pub fn dwmac_dma_reset() {
-    log::info!("-------------dwmac_dma_reset");
-    let mut value = readv(ETHERNET1 + DMA_BUS_MODE);
+    info!("-------------dwmac_dma_reset");
+    let value = readv(ETHERNET1 + DMA_BUS_MODE);
     writev(ETHERNET1 + DMA_BUS_MODE, value | DMA_BUS_MODE_SFT_RESET);
 
     loop {
         let val = readv(ETHERNET1 + DMA_BUS_MODE);
-        if value & DMA_BUS_MODE_SFT_RESET == 0 {
+        if val & DMA_BUS_MODE_SFT_RESET == 0 {
             info!("DMA reset Okay!");
             break;
         }
@@ -193,31 +194,31 @@ pub fn dwmac_dma_init_rxtx_chan(
     tdes_base: u32,
     tdes_end: u32,
 ) {
-    log::info!("---------------dwmac4_dma_init");
+    info!("---------------dwmac4_dma_init");
     writev(ETHERNET1 + DMA_BUS_MODE, 0x1);
 
     // f0f08f1
-    log::info!("---------------axi");
+    info!("---------------axi");
     writev(ETHERNET1 + DMA_BUS_MODE, 0xf0f08f1);
 
-    log::info!("------------------dwmac410_dma_init_channel");
+    info!("------------------dwmac410_dma_init_channel");
     writev(ETHERNET1 + dma_ch0_control, 0);
 
     //RX
-    log::info!("------------------dwmac4_dma_init_rx_chan");
+    info!("------------------dwmac4_dma_init_rx_chan");
     writev(ETHERNET1 + dma_ch0_rx_control, 0x100000);
 
-    log::info!("-------------set rx base");
+    info!("-------------set rx base");
     writev(ETHERNET1 + dma_ch0_rxdesc_list_address, rdes_base);
 
-    log::info!("-------------set rx end");
+    info!("-------------set rx end");
     writev(ETHERNET1 + dma_ch0_rxdesc_tail_pointer, rdes_end);
 
     //TX
-    log::info!("------------------dwmac4_dma_init_tx_chan");
+    info!("------------------dwmac4_dma_init_tx_chan");
     writev(ETHERNET1 + dma_ch0_tx_control, 0x100010);
 
-    log::info!("-------------set tx base");
+    info!("-------------set tx base");
     writev(ETHERNET1 + dma_ch0_txdesc_list_address, tdes_base);
 
     // 设置收发ring个数长度
@@ -225,7 +226,7 @@ pub fn dwmac_dma_init_rxtx_chan(
 }
 
 pub fn set_mac_addr() {
-    log::info!("set mac addr");
+    info!("set mac addr");
     // let mac_id: [u8; 6] = [0xaa, 0xbb, 0xcc, 0xdd, 0x05, 0x06];
 
     let macid_lo = 0xddccbbaa;
@@ -236,7 +237,7 @@ pub fn set_mac_addr() {
 }
 
 pub fn dwmac4_core_init() {
-    log::info!("--------- dwmac4_core_init");
+    info!("--------- dwmac4_core_init");
     writev(ETHERNET1, 0x78200);
 
     /* Enable GMAC interrupts */
@@ -245,25 +246,25 @@ pub fn dwmac4_core_init() {
 }
 
 pub fn dwmac_mtl_queue_set() {
-    log::info!("------------------dwmac4_map_mtl_dma");
+    info!("------------------dwmac4_map_mtl_dma");
     writev(ETHERNET1 + MTL_RXQ_DMA_MAP0, 0x0); // queue < 4
 
-    log::info!("------------------dwmac4_rx_queue_enable");
+    info!("------------------dwmac4_rx_queue_enable");
     writev(ETHERNET1 + mac_rxq_ctrl0, 0x2);
 
-    log::info!("------------------dwmac4_dma_rx_chan_op_mode");
+    info!("------------------dwmac4_dma_rx_chan_op_mode");
     writev(ETHERNET1 + mtl_rxq0_operation_mode, 0x700000);
 
-    log::info!("------------------dwmac4_dma_tx_chan_op_mode");
+    info!("------------------dwmac4_dma_tx_chan_op_mode");
     writev(ETHERNET1 + mtl_txq0_operation_mode, 0x70018);
 }
 
 pub fn dwmac4_set_rxtx_ring_len(rx_ring_len: u32, tx_ring_len: u32) {
-    log::info!("-------------dwmac4_set_tx_ring_len");
+    info!("-------------dwmac4_set_tx_ring_len");
     let tx_ring_len = 64; // chanel = 0;
     writev(ETHERNET1 + dma_ch0_txdesc_ring_length, tx_ring_len);
 
-    log::info!("-------------dwmac4_set_rx_ring_len");
+    info!("-------------dwmac4_set_rx_ring_len");
     let rx_ring_len = 64; // chanel = 0;
     writev(ETHERNET1 + dma_ch0_rxdesc_ring_length, rx_ring_len);
 }
@@ -282,14 +283,14 @@ pub fn dwmac4_flow_ctrl() {
 
     /*
         // dwmac4_flow_ctrl ?
-    log::info!("--------------tx flow contrl");
+    info!("--------------tx flow contrl");
         writev((ETHERNET1) + mac_q0_tx_flow_ctrl, 0xffff0000);
 
-    log::info!("--------------tx flow contrl");
+    info!("--------------tx flow contrl");
     // not duplex now?
         writev((ETHERNET1) + mac_q0_tx_flow_ctrl, GMAC_TX_FLOW_CTRL_TFE);
 
-    log::info!("--------------tx flow contrl");
+    info!("--------------tx flow contrl");
     let pause_time = 0xffff;
     let flow = GMAC_TX_FLOW_CTRL_TFE | (pause_time << GMAC_TX_FLOW_CTRL_PT_SHIFT);
     writev((ETHERNET1) + mac_q0_tx_flow_ctrl, flow); //0xffff0002
@@ -303,29 +304,29 @@ pub fn dwmac4_flow_ctrl() {
 
 pub fn dma_start_rxtx() {
     info!("--------- dma start RX");
-    let mut value = readv(ETHERNET1 + dma_ch0_rx_control);
+    let value = readv(ETHERNET1 + dma_ch0_rx_control);
     writev(
         ETHERNET1 + dma_ch0_rx_control,
         value | EQOS_DMA_CH0_RX_CONTROL_SR,
     );
 
-    let mut value = readv(ETHERNET1);
+    let value = readv(ETHERNET1);
     writev((ETHERNET1), value | EQOS_MAC_CONFIGURATION_RE);
 
     info!("--------- dma start TX");
-    let mut value = readv(ETHERNET1 + dma_ch0_tx_control);
+    let value = readv(ETHERNET1 + dma_ch0_tx_control);
     writev(
         ETHERNET1 + dma_ch0_tx_control,
         value | EQOS_DMA_CH0_TX_CONTROL_ST,
     );
-    let mut value = readv(ETHERNET1);
+    let value = readv(ETHERNET1);
     writev((ETHERNET1), value | EQOS_MAC_CONFIGURATION_TE);
 }
 
 pub fn stmmac_mac_link_up() {
     // phy_config() ?
 
-    log::info!("--------------stmmac_mac_link_up");
+    info!("--------------stmmac_mac_link_up");
     writev(ETHERNET1, 0x8072203);
 }
 

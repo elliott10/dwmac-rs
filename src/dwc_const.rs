@@ -1,4 +1,4 @@
-#![allow(unused)]
+#![allow(unused, non_snake_case, non_upper_case_globals)]
 
 /* Core registers */
 
