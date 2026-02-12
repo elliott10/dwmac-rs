@@ -3,7 +3,7 @@ dwmac ethernet driver in Rust on board `StarFive VisionFive 2`.
 
 ## Quick Start
 
-For instance, [dwmac ethernet driver in Rust on StarryOS]( )
+For instance, [dwmac ethernet driver in Rust on StarryOS](https://github.com/elliott10/arceos/commit/2360a3dce27592789b86168e43f0126a22befaf8)
 
 * Initialize ethernet driver
 ```
@@ -24,7 +24,6 @@ let recv_packets = dwmac_device.receive();
 ### Build
 
 ```
-cargo build --target=aarch64-unknown-none-softfloat
 cargo build --target=riscv64gc-unknown-none-elf
 ```
 

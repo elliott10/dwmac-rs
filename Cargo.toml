@@ -1,13 +1,12 @@
 [package]
-name = "dwmac-rs"
+name = "dwmac-my"
 edition = "2021"
 authors = ["MingYang <my@famer.me>", "Xiao <xiaoluoyuan@163.com>"]
-description = "DWMAC 5.x Ethernet Driver"
 keywords = ["dwmac", "ethernet", "driver", "riscv"]
 version = "0.2.0"
 license = "MIT"
-homepage = "https://github.com/elliott10/dwmac-rs.git"
 repository = "https://github.com/elliott10/dwmac-rs.git"
+description = "DWMAC ethernet driver in Rust on board `StarFive VisionFive 2`"
 
 [dependencies]
 log = "0.4"
